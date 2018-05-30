@@ -13,7 +13,7 @@ Example:
 python OMSCS_course_availability.py username password
 
 ## Requirements
-0) Python
+0) Python 3.x
 1) selenium installed for Python
 2) [geckodriver](https://github.com/mozilla/geckodriver/releases) for Firefox
 
