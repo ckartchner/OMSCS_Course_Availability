@@ -20,3 +20,6 @@ python OMSCS_course_availability.py username password
 Using other browsers should work as well, but the [appropriate driver](https://seleniumhq.github.io/docs/wd.html#quick_reference) will be needed. 
 Additionally, the line identifying the browser will also need to be edited: "browser = webdriver.Firefox()"
 
+## Notes
+Semester selection is currenly hardcoded to Fall 2018. Update TBD.  
+Ideally it would be preferable if a login wasn't needed to access these pages. Are you listening GT?
