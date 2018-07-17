@@ -13,6 +13,11 @@ def main(userid, pwd):
     This script assists with loginning in and takes the user
     directly to the course availability page.relevant to OMSCS students
     """
+    # Route selection
+    # There are multiple routes to get to the course availability
+    # The path flag is used to switch the route used.
+    path = 'new'
+
     # General browser config
     browser = webdriver.Firefox()
     browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
@@ -34,22 +39,25 @@ def main(userid, pwd):
     # timeout in seconds
     WebDriverWait(browser, 120).until(EC.title_is("BuzzPort"))
 
-    # Neither by link or by partial link work here.... why?
-    # browser.find_element_by_link_text("Student").click()
-    # browser.find_element_by_partial_link_text("Student").click()
     browser.find_element_by_xpath(".//a[contains(text(), 'Student')]").click()
-    # ditto above comment
-    # browser.find_element_by_link_text("Look Up Classes").click()
-    browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]"). click()
+    if path == "old":
+        # This quick link has been broken/missing for June/July Summer 2018
+        browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]"). click()
+        # Since the iframe is a separate HTML document embedded in the current
+        # one, it is very important to switch to the relevant iframe
+        browser.switch_to.frame("the_iframe")
+    else:
+        browser.find_element_by_xpath(".//a[contains(text(), 'Registration - OSCAR')]").click()
+        browser.switch_to.frame("the_iframe")
+        browser.find_element_by_name("StuWeb-MainMenuLink").click()
+        browser.find_element_by_xpath(".//a[contains(text(), 'Registration')]").click()
+        browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]").click()
 
-    # Since the iframe is a separate HTML document embedded in the current one,
-    # it is very important to switch to the relevant iframe
-    browser.switch_to.frame("the_iframe")
-
-    # TBD add a check here if the options change
     # XPath is the language used to locate nodes in an XML doc
-    # Also add a method to easily change semesters
+
     # Select Fall 2018, Advanced View, Computer Science, Online courses
+    # TBD(1): add check here if the options change
+    # TBD(2): add method to easily change semesters
 
     # Select Fall
     browser.find_element_by_xpath("//option[@value='201808']").click()
@@ -62,7 +70,6 @@ def main(userid, pwd):
     select = Select(browser.find_element_by_id("camp_id"))  # Select Campus
     select.deselect_all()  # If this isn't done, multiple items are selected
     select.select_by_value('O')  # Select only online options
-    # browser.find_element_by_xpath("(//option[@value='0'])[2]").click()
     browser.find_element_by_name("SUB_BTN").click()
 
 
@@ -86,6 +93,9 @@ if __name__ == "__main__":
     Can be called with username and password as CLI arguments
     OR
     With username and password as elements of local .env file
+
+    Added .env per recommendation in Miguel Grinberg's 2018 PyCon talk
+    https://www.youtube.com/watch?v=2uaTPmNvH0I
     """
 
     if len(sys.argv) == 1:
