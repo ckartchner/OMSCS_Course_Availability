@@ -4,8 +4,10 @@ from selenium.webdriver.support import expected_conditions as EC  # available si
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
 from dotenv import load_dotenv  # installed with 'pip install python-dotenv'
+from lxml import html
 import sys
 import os
+import unicodedata
 
 
 def main(userid, pwd):
@@ -71,6 +73,25 @@ def main(userid, pwd):
     select.deselect_all()  # If this isn't done, multiple items are selected
     select.select_by_value('O')  # Select only online options
     browser.find_element_by_name("SUB_BTN").click()
+
+    #Scrape table
+    # browser.switch_to.frame("the_iframe")
+    html_source = browser.page_source
+    parsed = html.fromstring(html_source)
+    # Subelements selected below:
+    # [0] - tbody
+    # [1] - "Sections Found"
+    course_table = parsed.xpath('//table[@class="datadisplaytable"]')[0][1]
+
+    # The first element of the table is the "Computer Science" section
+    # Second element is the row labeling the columns
+    # All remaining elements are rows for each course
+    # unicode normalize removes \xa0 and any other potentially odd unicode surprises
+    rows = [unicodedata.normalize("NFKD", a.text_content()).split('\n') for a in course_table]
+
+    # Print all rows:
+    print(*rows, sep='\n')
+
 
 
 def bad_args():
