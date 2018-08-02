@@ -3,6 +3,7 @@ from selenium.webdriver.support.ui import WebDriverWait  # available since 2.4.0
 from selenium.webdriver.support import expected_conditions as EC  # available since 2.26.0
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.firefox.options import Options
 from dotenv import load_dotenv  # installed with 'pip install python-dotenv'
 from lxml import html
 import sys
@@ -18,10 +19,12 @@ def main(userid, pwd):
     # Route selection
     # There are multiple routes to get to the course availability
     # The path flag is used to switch the route used.
-    path = 'new'
+    route_to_data = 'new'
 
     # General browser config
-    browser = webdriver.Firefox()
+    options = Options()
+    options.set_headless(headless=True)
+    browser = webdriver.Firefox(firefox_options=options)
     browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
 
     browser.get("https://buzzport.gatech.edu/cp/home/displaylogin")
@@ -42,7 +45,7 @@ def main(userid, pwd):
     WebDriverWait(browser, 120).until(EC.title_is("BuzzPort"))
 
     browser.find_element_by_xpath(".//a[contains(text(), 'Student')]").click()
-    if path == "old":
+    if route_to_data == "old":
         # This quick link has been broken/missing for June/July Summer 2018
         browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]"). click()
         # Since the iframe is a separate HTML document embedded in the current
