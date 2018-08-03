@@ -4,47 +4,92 @@ from selenium.webdriver.support import expected_conditions as EC  # available si
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.by import By
 from dotenv import load_dotenv  # installed with 'pip install python-dotenv'
 from lxml import html
 import sys
 import os
 import unicodedata
+import logging
 
+import pickle
+import time
 
-def main(userid, pwd):
+def setup_logging():
+    logging.basicConfig(
+            filename='OMSCS_CA.log',
+            format='%(asctime)s %(levelname)-8s %(message)s',
+            level=logging.DEBUG)
+
+def browser_setup():
     """
-    This script assists with loginning in and takes the user
-    directly to the course availability page.relevant to OMSCS students
+    General browser config
     """
-    # Route selection
-    # There are multiple routes to get to the course availability
-    # The path flag is used to switch the route used.
-    route_to_data = 'new'
-
     # General browser config
     options = Options()
-    options.set_headless(headless=True)
+    options.set_headless(headless=False)
     browser = webdriver.Firefox(firefox_options=options)
-    browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
 
+    # #Load cookies ... doesn't help bypass the need for a push
+    # browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
+    # browser.get("https://buzzport.gatech.edu/cp/home/displaylogin")
+    # try:
+    #     cookies = pickle.load(open("cookies.pkl", "rb"))
+    #     for cookie in cookies:
+    #         browser.add_cookie(cookie)
+    # except FileNotFoundError:
+    #     logging.debug('Cookie Monster is disappointed. No cookies found.')
+    # browser.find_element_by_id("login_btn").click()
+
+    return browser
+
+def gt_login(browser):
+    auto_push = False
+    logging.debug('Opening login page')
+    browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
     browser.get("https://buzzport.gatech.edu/cp/home/displaylogin")
     browser.find_element_by_id("login_btn").click()
+
     # Login if not already logged in.
-    # Note: Not yet validated running if already logged in.
+    # Note: Not yet able to bypass login
     try:
         browser.find_element_by_id("username").clear()
         browser.find_element_by_id("username").send_keys(userid)
         browser.find_element_by_id("password").clear()
         browser.find_element_by_id("password").send_keys(pwd)
         browser.find_element_by_name("submit").click()
+        logging.debug("Password submission path taken")
     except NoSuchElementException:
-        print("It appears you are already authenticated")
+        logging.debug("It appears you were already authenticated")
+
+    if auto_push == False:
+        # Ensures remember me for 7 days is selected when push gets sent
+        # Doesn't seem to matter though... login info save between sessions not yet working.
+        WebDriverWait(browser, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "duo_iframe")))
+        # Select "Remember me for 7 days"
+        WebDriverWait(browser, 10).until(EC.element_to_be_clickable((By.NAME, "dampen_choice")))
+        browser.find_element_by_name("dampen_choice").click()
+        # Send Push
+        WebDriverWait(browser,10).until(EC.element_to_be_clickable((By.XPATH, ".//button[contains(text(), 'Send Me a Push')]")))
+        browser.find_element_by_xpath(".//button[contains(text(), 'Send Me a Push')]").click()
+        browser.switch_to.default_content()
+        logging.debug("Duo request sent to phone")
+
 
     # Long variable delay here due to waiting for duo authentication
     # timeout in seconds
     WebDriverWait(browser, 120).until(EC.title_is("BuzzPort"))
-
+    # Store login cookies
+    # pickle.dump(browser.get_cookies(), open("cookies.pkl", "wb"))
     browser.find_element_by_xpath(".//a[contains(text(), 'Student')]").click()
+
+def scrape_courses(browser):
+    # TBD... add link to main buzzport page so this can be recalled
+    # Route selection
+    # There are multiple routes to get to the course availability
+    # The path flag is used to switch the route used.
+    route_to_data = 'new'
+    # Encountered unhandled error below if OSCAR is unavailable (2Aug2018)
     if route_to_data == "old":
         # This quick link has been broken/missing for June/July Summer 2018
         browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]"). click()
@@ -65,7 +110,7 @@ def main(userid, pwd):
     # TBD(2): add method to easily change semesters
 
     # Select Fall
-    browser.find_element_by_xpath("//option[@value='201808']").click()
+    browser.find_element_by_xpath(f"//option[@value={semester}]").click()
     # Submit semester selection
     browser.find_element_by_xpath("//input[@value='Submit']").click()
     # Perform Advanced Search
@@ -91,11 +136,22 @@ def main(userid, pwd):
     # All remaining elements are rows for each course
     # unicode normalize removes \xa0 and any other potentially odd unicode surprises
     rows = [unicodedata.normalize("NFKD", a.text_content()).split('\n') for a in course_table]
+    return rows
+
+def main(userid, pwd, semester='201808'):
+    """
+    This script assists with logging in and takes the user
+    directly to the course availability page.relevant to OMSCS students
+    """
+
+
+    setup_logging()
+    browser = browser_setup()
+    gt_login(browser)
+    rows = scrape_courses(browser)
 
     # Print all rows:
     print(*rows, sep='\n')
-
-
 
 def bad_args():
     """
