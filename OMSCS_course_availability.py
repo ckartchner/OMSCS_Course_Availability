@@ -14,6 +14,7 @@ import logging
 
 import pickle
 import time
+import datetime
 
 def setup_logging():
     logging.basicConfig(
@@ -72,6 +73,7 @@ def gt_login(browser):
         # Send Push
         WebDriverWait(browser,10).until(EC.element_to_be_clickable((By.XPATH, ".//button[contains(text(), 'Send Me a Push')]")))
         browser.find_element_by_xpath(".//button[contains(text(), 'Send Me a Push')]").click()
+        # Without switching out of the iframe, a "Can't access dead object" error will be thrown with next find attempt
         browser.switch_to.default_content()
         logging.debug("Duo request sent to phone")
 
@@ -81,28 +83,33 @@ def gt_login(browser):
     WebDriverWait(browser, 120).until(EC.title_is("BuzzPort"))
     # Store login cookies
     # pickle.dump(browser.get_cookies(), open("cookies.pkl", "wb"))
+
     browser.find_element_by_xpath(".//a[contains(text(), 'Student')]").click()
 
-def scrape_courses(browser):
+def scrape_courses(browser, semester):
     # TBD... add link to main buzzport page so this can be recalled
     # Route selection
     # There are multiple routes to get to the course availability
     # The path flag is used to switch the route used.
     route_to_data = 'new'
-    # Encountered unhandled error below if OSCAR is unavailable (2Aug2018)
-    if route_to_data == "old":
-        # This quick link has been broken/missing for June/July Summer 2018
-        browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]"). click()
-        # Since the iframe is a separate HTML document embedded in the current
-        # one, it is very important to switch to the relevant iframe
-        browser.switch_to.frame("the_iframe")
-    else:
-        browser.find_element_by_xpath(".//a[contains(text(), 'Registration - OSCAR')]").click()
-        browser.switch_to.frame("the_iframe")
-        browser.find_element_by_name("StuWeb-MainMenuLink").click()
-        browser.find_element_by_xpath(".//a[contains(text(), 'Registration')]").click()
-        browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]").click()
-
+    # Encountered error below if OSCAR is unavailable (2Aug2018)
+    try:
+        if route_to_data == "old":
+            # This quick link has been broken/missing for June/July Summer 2018
+            browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]"). click()
+            # Since the iframe is a separate HTML document embedded in the current
+            # one, it is very important to switch to the relevant iframe
+            browser.switch_to.frame("the_iframe")
+        else:
+            browser.find_element_by_xpath(".//a[contains(text(), 'Registration - OSCAR')]").click()
+            browser.switch_to.frame("the_iframe")
+            browser.find_element_by_name("StuWeb-MainMenuLink").click()
+            browser.find_element_by_xpath(".//a[contains(text(), 'Registration')]").click()
+            browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]").click()
+    except Exception as e:
+        logging.critical(f"OSCAR error. Exception: {e}")
+        timestamp = str(datetime.datetime.now())
+        browser.save_screenshot(f'screenshot_OSCAR_attempt_{timestamp}.png')
     # XPath is the language used to locate nodes in an XML doc
 
     # Select Fall 2018, Advanced View, Computer Science, Online courses
@@ -143,12 +150,10 @@ def main(userid, pwd, semester='201808'):
     This script assists with logging in and takes the user
     directly to the course availability page.relevant to OMSCS students
     """
-
-
     setup_logging()
     browser = browser_setup()
     gt_login(browser)
-    rows = scrape_courses(browser)
+    rows = scrape_courses(browser, semester)
 
     # Print all rows:
     print(*rows, sep='\n')
