@@ -303,7 +303,7 @@ def scheduled_actions(browser, semester, userid, pwd):
     scrape_time = datetime.datetime.now()
     add_to_db(rows, scrape_time)
 
-def main(userid, pwd, semester='201808'):
+def coordinator(userid, pwd, semester='201808'):
     """
     Coordinates high level actions scraper
 
@@ -319,9 +319,8 @@ def main(userid, pwd, semester='201808'):
     scheduler.add_job(scheduled_actions,
                       args=[browser, semester, userid, pwd],
                       trigger='interval',
-                      minutes=1,
+                      minutes=30,
                       next_run_time=datetime.datetime.now())
-
     try:
         print("Starting scheduler")
         print('Press Ctrl+C to exit')
@@ -341,7 +340,7 @@ def bad_args():
     print("By setting up a .env file (recommended)")
     exit()
 
-def cli_call():
+def cli_actions():
     """
     Actions to take only when run as a script.
 
@@ -366,13 +365,13 @@ def cli_call():
             ba += 1
         if ba > 0:
             bad_args()
-        main(userid, pwd)
+        coordinator(userid, pwd)
     elif len(sys.argv) == 3:
         # Actions if username and password supplied as CLI arguments
         userid = sys.argv[1]
         pwd = sys.argv[2]
-        main(userid, pwd)
+        coordinator(userid, pwd)
 
 
 if __name__ == "__main__":
-    cli_call()
+    cli_actions()
