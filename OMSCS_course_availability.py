@@ -51,20 +51,20 @@ def browser_setup():
     options.set_headless(headless=False)
     browser = webdriver.Firefox(firefox_options=options)
 
-    #Load cookies ... doesn't help bypass the need for a push
-    browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
-    browser.get("https://buzzport.gatech.edu/cp/home/displaylogin")
-    try:
-        cookies = pickle.load(open("cookies.pkl", "rb"))
-        for cookie in cookies:
-            browser.add_cookie(cookie)
-    except FileNotFoundError:
-        logging.debug('Cookie Monster is disappointed. No cookies found.')
-    browser.find_element_by_id("login_btn").click()
+    # Load cookies ... doesn't help bypass the need for a push
+    # browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
+    # browser.get("https://buzzport.gatech.edu/cp/home/displaylogin")
+    # try:
+    #     cookies = pickle.load(open("cookies.pkl", "rb"))
+    #     for cookie in cookies:
+    #         browser.add_cookie(cookie)
+    # except FileNotFoundError:
+    #     logging.debug('Cookie Monster is disappointed. No cookies found.')
+    # browser.find_element_by_id("login_btn").click()
 
     return browser
 
-def gt_login(browser):
+def gt_login(browser, userid, pwd):
     auto_push = False
     logging.debug('Opening login page')
     browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
@@ -109,7 +109,7 @@ def gt_login(browser):
     # timeout in seconds
     WebDriverWait(browser, 120).until(EC.title_is("BuzzPort"))
     # Store login cookies
-    pickle.dump(browser.get_cookies(), open("cookies.pkl", "wb"))
+    # pickle.dump(browser.get_cookies(), open("cookies.pkl", "wb"))
     browser.find_element_by_xpath(".//a[contains(text(), 'Student')]").click()
 
 def scrape_courses(browser, semester):
@@ -178,16 +178,18 @@ def scrape_courses(browser, semester):
 
     # Print all rows:
     # print(*rows, sep='\n')
-    logging.debug("ScrapeComplete")
+    logging.debug("Scrape complete")
     return rows
 
 def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
     # Check that the dimensions are parsed as expected
     # Needs to be updated with better failure message
     # Failure scenario untested
-    row_lengths = set([len(row) for row in rows[1:]])
-    if row_lengths != {22}:
-        print(f'row_lengths:\n{row_lengths}')
+    row_size = 22
+    ue_rows = [row for row in rows[1:] if len(row) != row_size]
+    if len(ue_rows) != 0:
+        logging.error(f"Bad row lengths found:{len(ue_rows)}")
+        logging.error(f"Rows\n{ue_rows}")
 
     ## Build Table ##
     # conn = sqlite3.connect(':memory:', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
@@ -283,7 +285,7 @@ def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
     conn.close()
     logging.debug("DB fill finished")
 
-def scheduled_actions(browser, semester):
+def scheduled_actions(browser, semester, userid, pwd):
     """
     Actions taken repeatedly to generate timeseries
 
@@ -296,25 +298,28 @@ def scheduled_actions(browser, semester):
     ct = datetime.datetime.now()
     print(f"Taking scheduled action {ct}")
     logging.debug(f"Preforming scheduled actions on {semester}")
-    gt_login(browser)
+    gt_login(browser, userid, pwd)
     rows = scrape_courses(browser, semester)
     scrape_time = datetime.datetime.now()
     add_to_db(rows, scrape_time)
 
 def main(userid, pwd, semester='201808'):
     """
-    This script assists with logging in and takes the user
-    directly to the course availability page.relevant to OMSCS students
-    """
+    Coordinates high level actions scraper
 
+    :param userid:
+    :param pwd:
+    :param semester:
+    :return:
+    """
     logging.debug("Running main code")
     # setup_logging()
     browser = browser_setup()
     scheduler = BlockingScheduler()
     scheduler.add_job(scheduled_actions,
-                      args=[browser, semester],
+                      args=[browser, semester, userid, pwd],
                       trigger='interval',
-                      minutes=30,
+                      minutes=1,
                       next_run_time=datetime.datetime.now())
 
     try:
@@ -336,8 +341,7 @@ def bad_args():
     print("By setting up a .env file (recommended)")
     exit()
 
-
-if __name__ == "__main__":
+def cli_call():
     """
     Actions to take only when run as a script.
 
@@ -348,7 +352,6 @@ if __name__ == "__main__":
     Added .env per recommendation in Miguel Grinberg's 2018 PyCon talk
     https://www.youtube.com/watch?v=2uaTPmNvH0I
     """
-
     if len(sys.argv) == 1:
         # If no CLI arguments, check local .env
         load_dotenv(dotenv_path="./.env")
@@ -369,3 +372,7 @@ if __name__ == "__main__":
         userid = sys.argv[1]
         pwd = sys.argv[2]
         main(userid, pwd)
+
+
+if __name__ == "__main__":
+    cli_call()
