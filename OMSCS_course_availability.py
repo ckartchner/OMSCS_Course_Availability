@@ -19,6 +19,7 @@ import datetime
 import sqlite3
 import re
 
+from apscheduler.schedulers.blocking import BlockingScheduler
 """
 Notes:
 XPath is the language used to locate nodes in an XML doc
@@ -26,13 +27,20 @@ XPath is the language used to locate nodes in an XML doc
 
 """
 
-def setup_logging():
-    logging.basicConfig(
-            filename='OMSCS_CA.log',
-            format='%(asctime)s %(levelname)-8s %(message)s',
-            level=logging.DEBUG)
-    # Set Selenium log level
-    LOGGER.setLevel(logging.WARNING)
+# Probably need to do something about the scope here
+logging.basicConfig(
+    filename='OMSCS_CA.log',
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.DEBUG)
+LOGGER.setLevel(logging.WARNING)
+
+# def setup_logging():
+#     logging.basicConfig(
+#             filename='OMSCS_CA.log',
+#             format='%(asctime)s %(levelname)-8s %(message)s',
+#             level=logging.DEBUG)
+#     # Set Selenium log level
+#     # LOGGER.setLevel(logging.WARNING)
 
 def browser_setup():
     """
@@ -95,7 +103,6 @@ def gt_login(browser):
             logging.debug("Duo request sent to phone")
 
     except NoSuchElementException:
-        print("No DUO!!!")
         logging.debug("Buzzport login already authenticated")
 
     # Long variable delay here due to waiting for duo authentication
@@ -170,7 +177,8 @@ def scrape_courses(browser, semester):
     rows = [unicodedata.normalize("NFKD", a.text_content()).split('\n') for a in course_table]
 
     # Print all rows:
-    print(*rows, sep='\n')
+    # print(*rows, sep='\n')
+    logging.debug("ScrapeComplete")
     return rows
 
 def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
@@ -273,19 +281,48 @@ def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
 
     conn.commit()
     conn.close()
+    logging.debug("DB fill finished")
+
+def scheduled_actions(browser, semester):
+    """
+    Actions taken repeatedly to generate timeseries
+
+    I see potential here for unhandled exceptions if resources unavailable
+
+    :param browser:
+    :param semester:
+    :return:
+    """
+    ct = datetime.datetime.now()
+    print(f"Taking scheduled action {ct}")
+    logging.debug(f"Preforming scheduled actions on {semester}")
+    gt_login(browser)
+    rows = scrape_courses(browser, semester)
+    scrape_time = datetime.datetime.now()
+    add_to_db(rows, scrape_time)
 
 def main(userid, pwd, semester='201808'):
     """
     This script assists with logging in and takes the user
     directly to the course availability page.relevant to OMSCS students
     """
-    setup_logging()
+
+    logging.debug("Running main code")
+    # setup_logging()
     browser = browser_setup()
-    for i in range(0,4):
-        gt_login(browser)
-        rows = scrape_courses(browser, semester)
-        scrape_time = datetime.datetime.now()
-        add_to_db(rows, scrape_time)
+    scheduler = BlockingScheduler()
+    scheduler.add_job(scheduled_actions,
+                      args=[browser, semester],
+                      trigger='interval',
+                      minutes=30,
+                      next_run_time=datetime.datetime.now())
+
+    try:
+        print("Starting scheduler")
+        print('Press Ctrl+C to exit')
+        scheduler.start()
+    except (KeyboardInterrupt, SystemExit):
+        pass
 
 def bad_args():
     """
