@@ -1,3 +1,6 @@
 *.pyc
 .env
-geckodriver.log
+*.log
+*.db
+cookies.pkl
+screenshots/
