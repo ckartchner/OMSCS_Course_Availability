@@ -12,6 +12,8 @@ import sys
 import os
 import unicodedata
 import logging
+# import logging.handlers
+import smtplib
 
 import pickle
 import time
@@ -20,6 +22,9 @@ import sqlite3
 import re
 
 from apscheduler.schedulers.blocking import BlockingScheduler
+
+
+
 """
 Notes:
 XPath is the language used to locate nodes in an XML doc
@@ -41,6 +46,23 @@ LOGGER.setLevel(logging.WARNING)
 #             level=logging.DEBUG)
 #     # Set Selenium log level
 #     # LOGGER.setLevel(logging.WARNING)
+
+def send_email():
+    """
+    May be a better way to do this... probably
+    using logger smtp handler?
+    https://stackoverflow.com/questions/6182693/python-send-email-when-exception-is-raised
+
+    :return:
+    """
+    logging.debug('Sending email notification of error')
+    server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+    server.login(email_user, email_pwd)
+    server.sendmail(
+        from_email,
+        to_email,
+        "The system is down v2")
+    server.quit()
 
 def browser_setup():
     """
@@ -66,18 +88,35 @@ def browser_setup():
 
     return browser
 
+def catchall(function):
+    def wrapper(*args, **kwargs):
+        try:
+            function(*args, **kwargs)
+        except:
+            # logging.debug("Unhandled error in login")
+            logging.exception("Unhandled error in login eh")
+            print("Exception caught")
+            send_email()
+    return wrapper
+
+@catchall
 def gt_login(browser, userid, pwd):
     auto_push = False
     logging.debug('Opening login page')
     browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
     try:
+        # Hasty attempt to avoid error "Malformed URL: can't access dead object.
+        # https://stackoverflow.com/questions/47770694/malformed-url-cant-access-dead-object-in-selenium-when-trying-to-open-google
+        # Not really sure why it appeared in the first place
+        browser.switch_to.default_content()
+
         browser.get("https://buzzport.gatech.edu/cp/home/displaylogin")
         browser.find_element_by_id("login_btn").click()
-    except Exception as e::
+    except Exception as e:
         logging.critical(f"Unhandled error at buzzport login. Exception: {e}")
         timestamp = str(datetime.datetime.now())
         browser.save_screenshot(f'./screenshots/Buzzport_attempt_{timestamp}.png')
-        exit()
+        raise
 
     # Login if not already logged in.
     # Note: Not yet able to bypass login
@@ -106,6 +145,8 @@ def gt_login(browser, userid, pwd):
 
     except NoSuchElementException:
         logging.debug("Buzzport login already authenticated")
+    except:
+        raise
 
     # Long variable delay here due to waiting for duo authentication
     # timeout in seconds
@@ -146,6 +187,7 @@ def scrape_courses(browser, semester):
         # If screenshot directory is missing, the screenshot is silently not saved
         timestamp = str(datetime.datetime.now())
         browser.save_screenshot(f'./screenshots/OSCAR_attempt_{timestamp}.png')
+        raise
 
     # Select Fall 2018, Advanced View, Computer Science, Online courses
     # TBD(1): add check here if the options change
@@ -305,6 +347,8 @@ def scheduled_actions(browser, semester, userid, pwd):
     scrape_time = datetime.datetime.now()
     add_to_db(rows, scrape_time)
 
+
+
 def coordinator(userid, pwd, semester='201808'):
     """
     Coordinates high level actions scraper
@@ -329,6 +373,7 @@ def coordinator(userid, pwd, semester='201808'):
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
         pass
+
 
 def bad_args():
     """
@@ -376,4 +421,18 @@ def cli_actions():
 
 
 if __name__ == "__main__":
+    # Lazy load of email. Update later.
+    load_dotenv(dotenv_path="./.env")
+    to_email = os.environ.get('TO_EMAIL')
+    from_email = os.environ.get('FROM_EMAIL')
+    email_pwd = os.environ.get('EMAIL_PWD')
+    email_user = os.environ.get('EMAIL_USER')
     cli_actions()
+    # try:
+    #     cli_actions()
+    # except Exception as e:
+    #     send_email()
+    #     print("Exception occurred, exiting!")
+    #     exit()
+    #     # logger.exception('Unhandled Exception')
+
