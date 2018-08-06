@@ -20,9 +20,9 @@ import time
 import datetime
 import sqlite3
 import re
+from textwrap import dedent  # De indent multi-line string
 
 from apscheduler.schedulers.blocking import BlockingScheduler
-
 
 
 """
@@ -47,21 +47,37 @@ LOGGER.setLevel(logging.WARNING)
 #     # Set Selenium log level
 #     # LOGGER.setLevel(logging.WARNING)
 
-def send_email():
+def send_email(subject: str="", body: str=""):
     """
-    May be a better way to do this... probably
-    using logger smtp handler?
-    https://stackoverflow.com/questions/6182693/python-send-email-when-exception-is-raised
+    TBD: Setup to use local SMTP server rather than remote
 
     :return:
     """
+    if subject == "":
+        subject = "OMSCS reg monitor unspecified error"
+    if body == "":
+        body = "Unspecified error occurred. Please refer to logs for more info"
+    # Lazy load of email. Update later to be function parameters
+    load_dotenv(dotenv_path="./.env")
+    to_email = os.environ.get('TO_EMAIL')
+    from_email = os.environ.get('FROM_EMAIL')
+    email_pwd = os.environ.get('EMAIL_PWD')
+    email_user = os.environ.get('EMAIL_USER')
+
     logging.debug('Sending email notification of error')
     server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
     server.login(email_user, email_pwd)
-    server.sendmail(wo
+    message = f"""\
+        From: {from_email}
+        To: {to_email}
+        Subject: {subject}
+        {body}\
+        """
+    message = dedent(message)
+    server.sendmail(
         from_email,
         to_email,
-        "The system is down v2")
+        message)
     server.quit()
 
 def browser_setup():
@@ -104,6 +120,7 @@ def gt_login(browser, userid, pwd):
     auto_push = False
     logging.debug('Opening login page')
     browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
+    # raise ValueError('Testing: user generated exception')
     try:
         # Hasty attempt to avoid error "Malformed URL: can't access dead object.
         # https://stackoverflow.com/questions/47770694/malformed-url-cant-access-dead-object-in-selenium-when-trying-to-open-google
@@ -429,12 +446,6 @@ def cli_actions():
 
 
 if __name__ == "__main__":
-    # Lazy load of email. Update later.
-    load_dotenv(dotenv_path="./.env")
-    to_email = os.environ.get('TO_EMAIL')
-    from_email = os.environ.get('FROM_EMAIL')
-    email_pwd = os.environ.get('EMAIL_PWD')
-    email_user = os.environ.get('EMAIL_USER')
     cli_actions()
     # try:
     #     cli_actions()
