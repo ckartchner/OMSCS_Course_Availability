@@ -59,8 +59,8 @@ def send_email():
     server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
     server.login(email_user, email_pwd)
     server.sendmail(
-        from_email,
         to_email,
+        from_email,
         "The system is down v2")
     server.quit()
 
