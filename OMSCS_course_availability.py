@@ -80,15 +80,13 @@ def send_email(subject: str="", body: str=""):
         message)
     server.quit()
 
-def browser_setup():
+def browser_setup(headless=True):
     """
     General browser config
     """
     # General browser config
     options = Options()
-    # Note: deprecated - https://seleniumhq.github.io/selenium/docs/api/py/webdriver_firefox/selenium.webdriver.firefox.options.html
-    # options.set_headless(headless=False)
-    options.headless = True
+    options.headless = headless
     browser = webdriver.Firefox(firefox_options=options)
 
     # Load cookies ... doesn't help bypass the need for a push
@@ -304,6 +302,10 @@ def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
                 logging.warning("Changes to course table rows")
                 logging.warning(f"scrape: {row_data}")
                 logging.warning(f"db:     {tbl_data}")
+                # log differences:
+                for i in range(0,len(row_data)):
+                    if row_data[i] != tbl_data[i]:
+                        logging.warning(f"{tbl_data[i]} -> {row_data[i]}")
                 # Add course if change discovered
                 # Potential here for runaway course table growth
                 # Future should track relation of like rows
@@ -349,7 +351,6 @@ def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
             INSERT INTO {}
             VALUES (?, ?, ?, ?, ?, ?, ?)""".format(course),
                        row_stats)
-
     conn.commit()
     conn.close()
     logging.debug("DB fill finished")
@@ -371,8 +372,6 @@ def scheduled_actions(browser, semester, userid, pwd):
     rows = scrape_courses(browser, semester)
     scrape_time = datetime.datetime.now()
     add_to_db(rows, scrape_time)
-
-
 
 def coordinator(userid, pwd, semester='201808'):
     """
@@ -398,7 +397,6 @@ def coordinator(userid, pwd, semester='201808'):
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
         pass
-
 
 def bad_args():
     """
