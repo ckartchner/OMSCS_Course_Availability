@@ -48,7 +48,9 @@ def browser_setup():
     """
     # General browser config
     options = Options()
-    options.set_headless(headless=False)
+    # Note: deprecated - https://seleniumhq.github.io/selenium/docs/api/py/webdriver_firefox/selenium.webdriver.firefox.options.html
+    # options.set_headless(headless=False)
+    options.headless = True
     browser = webdriver.Firefox(firefox_options=options)
 
     # Load cookies ... doesn't help bypass the need for a push
@@ -71,7 +73,7 @@ def gt_login(browser, userid, pwd):
     try:
         browser.get("https://buzzport.gatech.edu/cp/home/displaylogin")
         browser.find_element_by_id("login_btn").click()
-    except:
+    except Exception as e::
         logging.critical(f"Unhandled error at buzzport login. Exception: {e}")
         timestamp = str(datetime.datetime.now())
         browser.save_screenshot(f'./screenshots/Buzzport_attempt_{timestamp}.png')
