@@ -58,9 +58,9 @@ def send_email():
     logging.debug('Sending email notification of error')
     server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
     server.login(email_user, email_pwd)
-    server.sendmail(
-        to_email,
+    server.sendmail(wo
         from_email,
+        to_email,
         "The system is down v2")
     server.quit()
 
@@ -284,9 +284,17 @@ def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
             cursor.execute(f"SELECT * FROM {course_tbl} where CRN='{crn}'")
             tbl_data = cursor.fetchone()
             if row_data != tbl_data:
-                logging.warning("Unhandled difference in course table")
+                logging.warning("Changes to course table rows")
                 logging.warning(f"scrape: {row_data}")
                 logging.warning(f"db:     {tbl_data}")
+                # Add course if change discovered
+                # Potential here for runaway course table growth
+                # Future should track relation of like rows
+                # This section could also be refactored
+                cursor.execute("""
+                    INSERT INTO {}
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".format(course_tbl),
+                               row_data)
 
     # Ensure there is no SQL in the course names
     # Highly unlikely, but good practice
