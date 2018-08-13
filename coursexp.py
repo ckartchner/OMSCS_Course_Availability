@@ -1,3 +1,8 @@
+"""
+Library for making interactions with GT registration
+a little less painful, and a little more automated.
+"""
+
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait  # available since 2.4.0
 from selenium.webdriver.support import expected_conditions as EC  # available since 2.26.0
@@ -8,29 +13,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.remote_connection import LOGGER
 from dotenv import load_dotenv  # installed with 'pip install python-dotenv'
 from lxml import html
-import sys
+# Standard library
+from textwrap import dedent  # De indent multi-line string
 import os
 import unicodedata
 import logging
-# import logging.handlers
 import smtplib
-
 import pickle
-import time
 import datetime
 import sqlite3
 import re
-from textwrap import dedent  # De indent multi-line string
-
-from apscheduler.schedulers.blocking import BlockingScheduler
-
-
-"""
-Notes:
-XPath is the language used to locate nodes in an XML doc
-
-
-"""
 
 # Probably need to do something about the scope here
 logging.basicConfig(
@@ -47,17 +39,22 @@ LOGGER.setLevel(logging.WARNING)
 #     # Set Selenium log level
 #     # LOGGER.setLevel(logging.WARNING)
 
+
 def send_email(subject: str="", body: str=""):
     """
-    TBD: Setup to use local SMTP server rather than remote
+    Send email notifications
 
-    :return:
+    Primarily used to surface unhandled exceptions
+    TBD: Setup to use sendmail or local SMTP server rather than remote
+
+    :param subject: Email subject as string
+    :param body: Email body as string
     """
     if subject == "":
         subject = "OMSCS reg monitor unspecified error"
     if body == "":
         body = "Unspecified error occurred. Please refer to logs for more info"
-    # Lazy load of email. Update later to be function parameters
+    # Load email addresses and login info through environment variables
     load_dotenv(dotenv_path="./.env")
     to_email = os.environ.get('TO_EMAIL')
     from_email = os.environ.get('FROM_EMAIL')
@@ -80,9 +77,12 @@ def send_email(subject: str="", body: str=""):
         message)
     server.quit()
 
+
 def browser_setup(headless=True):
     """
     General browser config
+
+    :param headless: Set if headless mode is to be used with the browser
     """
     # General browser config
     options = Options()
@@ -102,23 +102,57 @@ def browser_setup(headless=True):
 
     return browser
 
-def catchall(function):
+
+def catchall(fction):
+    """
+    Decorator which all exceptions raised by function
+
+    Used to add log info, and send email on exception
+
+    :param fction: function being wrapped
+    """
     def wrapper(*args, **kwargs):
         try:
-            function(*args, **kwargs)
+            fction(*args, **kwargs)
         except:
-            # logging.debug("Unhandled error in login")
-            logging.exception("Unhandled error in login eh")
+            logging.exception("Unhandled error in login exception handler")
             print("Exception caught")
             send_email()
     return wrapper
 
+
 @catchall
-def gt_login(browser, userid, pwd):
-    auto_push = False
+def gtlogin(browser, auto_push=False, **kwargs):
+    """
+    Login to buzzport
+
+    If not already logged in:
+    Logs in with GTID and credentials
+    Makes DUO request -- Requires user interaction
+
+    :param browser: selenium browser object
+    :param auto_push: Flag for Duo 2FA settings. Set true if 2FA request sent
+                      immediately on login. False if user needs to manually
+                      push 2FA. False recommended as it allows setting the
+                      remember me for 7 days flag.
+    :param kwargs: Used to optionally take login credentials as arguments
+    :return:
+    """
+
+    keys = kwargs.keys()
+    load_dotenv(dotenv_path="./.env")
+    if 'userid' in keys:
+        userid = kwargs['userid']
+    else:
+        userid = os.environ.get('OMS_ID')
+    if 'pwd' in keys:
+        pwd = kwargs['keys']
+    else:
+        pwd = os.environ.get('OMS_PWD')
+
     logging.debug('Opening login page')
     browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
-    # raise ValueError('Testing: user generated exception')
+
     try:
         # Hasty attempt to avoid error "Malformed URL: can't access dead object.
         # https://stackoverflow.com/questions/47770694/malformed-url-cant-access-dead-object-in-selenium-when-trying-to-open-google
@@ -143,7 +177,7 @@ def gt_login(browser, userid, pwd):
         browser.find_element_by_id("password").send_keys(pwd)
         browser.find_element_by_name("submit").click()
         logging.debug("Password submission path taken")
-        if auto_push == False:
+        if auto_push is False:
             # Ensures remember me for 7 days is selected when push gets sent
             # Doesn't seem to matter though... login info save between sessions not yet working.
             WebDriverWait(browser, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "duo_iframe")))
@@ -154,12 +188,14 @@ def gt_login(browser, userid, pwd):
             WebDriverWait(browser, 10).until(
                 EC.element_to_be_clickable((By.XPATH, ".//button[contains(text(), 'Send Me a Push')]")))
             browser.find_element_by_xpath(".//button[contains(text(), 'Send Me a Push')]").click()
-            # Without switching out of the iframe, a "Can't access dead object" error will be thrown with next find attempt
+            # Without switching out of the iframe, a "Can't access dead object"
+            # error will be thrown with next find attempt
             browser.switch_to.default_content()
             logging.debug("Duo request sent to phone")
 
     except NoSuchElementException:
         logging.debug("Buzzport login already authenticated")
+    # Raise exception to catchall. Unnecessary?
     except:
         raise
 
@@ -168,18 +204,19 @@ def gt_login(browser, userid, pwd):
     WebDriverWait(browser, 120).until(EC.title_is("BuzzPort"))
     # Store login cookies
     # pickle.dump(browser.get_cookies(), open("cookies.pkl", "wb"))
-    browser.find_element_by_xpath(".//a[contains(text(), 'Student')]").click()
 
-def scrape_courses(browser, semester):
+
+def _lookup_classes(browser):
     """
-    Collect the current status of the course enrollment
+    Navigate to lookup classes page
 
-    TBD... add link to main buzzport page so this can be recalled
+    Called by:
+    avail_sems
+    gotosem
 
-    :param browser: webdriver object
-    :param semester: semester name used on OSCAR
-    :return: 2d list of all courses
+    :param browser: selenium webdriver object
     """
+    browser.get("https://buzzport.gatech.edu/cps/welcome/loginok.html")
     # Original route went missing during summer 2018, but leaving here as it was shorter path
     route_to_data = 'new'
     # Encountered error below if OSCAR is unavailable (2Aug2018)
@@ -203,12 +240,114 @@ def scrape_courses(browser, semester):
         timestamp = str(datetime.datetime.now())
         browser.save_screenshot(f'./screenshots/OSCAR_attempt_{timestamp}.png')
         raise
+    return browser
 
-    # Select Fall 2018, Advanced View, Computer Science, Online courses
-    # TBD(1): add check here if the options change
-    # TBD(2): add method to easily change semesters
 
-    # Select Fall
+def avail_sems(browser, verbose=False, pkl=True, email_diffs=True):
+    """
+    BROKEN!!!
+    works fine on local data, but fails on GT servers
+    perhaps has something to do with iframe?!?!
+
+    Check what semester options are available
+
+    Compare to previous options if pickle file available
+
+    :param browser: selenium webdriver object
+    :param verbose: flag for verbose print statements
+    :param pkl: flag controlling if current read stored in pkl file
+    :param email_diffs: flag to control emailing about changes found
+    :return: success
+    """
+    logging.debug("Checking for semester options")
+    browser = _lookup_classes(browser)
+    # browser.switch_to.default_content()
+    # browser.switch_to.frame("the_iframe")
+    # select = Select(browser.find_element_by_name('term_in'))
+    select = Select(browser.find_element_by_xpath(f"//select[@name='term_in']"))
+    options = select.options
+    otext_l = [opt.text for opt in options]
+    ovalues_l = [opt.get_attribute("value") for opt in options]
+    otext_s = set(otext_l)
+    ovalues_s = set(ovalues_l)
+    if verbose:
+        print("Semester options:")
+        print(f"text:\n{otext_l}")
+        print(f"values:\n{ovalues_l}")
+    # If possible, compare current values with previous values
+    if len(otext_l) != len(otext_s):
+        logging.warning("Warning: duplicate elements in option text list")
+    if len(ovalues_l) != len(ovalues_s):
+        logging.warning("Warning: duplicate elements in option values list")
+    check_text = True
+    check_values = True
+    try:
+        old_text = pickle.load(open("semester_text_set.p", "rb"))
+    except FileNotFoundError:
+        check_text = False
+        logging.info("No prev semester text found")
+    try:
+        old_values = pickle.load(open("semester_values_set.p", "rb"))
+    except FileNotFoundError:
+        check_values = False
+        logging.info("No prev semester values found")
+    if check_text is True:
+        new_text = otext_s - old_text
+        dropped_text = old_text - otext_s
+        if len(new_text) > 0:
+            logging.info("New text:\n{new_text}")
+
+        else:
+            logging.info("No new text elements")
+        if len(dropped_text) > 0:
+            logging.info(f"Dropped text:\n{dropped_text}")
+        else:
+            logging.info("No dropped text elements")
+    if check_values is True:
+        new_values = ovalues_s - old_values
+        dropped_values = old_values - ovalues_s
+        if len(new_values) > 0:
+            logging.info(f"New values:\n{new_values}")
+        else:
+            logging.info("No new value elements")
+        if len(dropped_text) > 0:
+            logging.info(f"Dropped values:\n{dropped_values}")
+        else:
+            logging.info("No dropped value elements")
+    if email_diffs:
+        if len(new_text) > 0 or len(new_values) > 0:
+            subject = "New semester fields added to OSCAR"
+            body = f"""\
+            New text:{new_text}
+            New values:{new_values}
+            All text:
+            {otext_s}
+            All values:
+            {ovalues_s}\
+            """
+            body = dedent(body)
+            send_email(subject, body)
+    if pkl:
+        pickle.dump(otext_s, open("semester_text_set.p", "wb"))
+        pickle.dump(ovalues_s, open("semester_values_set.p", "wb"))
+
+
+def gotosem(browser, semester):
+    """
+    Navigate to the semester of interest
+
+    Select 'semester' -> Advanced View -> Computer Science -> Online courses
+
+    TBD:
+    Add test to ensure user is already logged in when this is called
+    Add check if the semester options change
+
+    :param browser: selenium webdriver object
+    :param semester: semester option value on webpage
+    """
+    _lookup_classes(browser)
+
+    # Select semester
     browser.find_element_by_xpath(f"//option[@value={semester}]").click()
     # Submit semester selection
     browser.find_element_by_xpath("//input[@value='Submit']").click()
@@ -221,7 +360,19 @@ def scrape_courses(browser, semester):
     select.select_by_value('O')  # Select only online options
     browser.find_element_by_name("SUB_BTN").click()
 
-    #Scrape table
+
+def scrape_courses(browser):
+    """
+    Scrape data from the table of courses
+
+    Assumes browser is already pointing at the page we want to scrape.
+
+    TBD - add check that current page is the one wanted
+    May also need to add iframe check
+
+    :param browser: selenium webdriver object
+    """
+    # Scrape table
     html_source = browser.page_source
     parsed = html.fromstring(html_source)
     # Subelements selected below:
@@ -240,17 +391,47 @@ def scrape_courses(browser, semester):
     logging.debug("Scrape complete")
     return rows
 
-def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
-    # Check that the dimensions are parsed as expected
-    # Needs to be updated with better failure message
-    # Failure scenario untested
+
+def dbadd(rows, scrape_time, dbname='OMSCS_CA.db'):
+    """
+    Creates/adds to course table & table for each course
+
+    Known legal row sizes:
+    22 if registration closed/unavailable
+    26 if registration open
+
+    :param rows: rows from course table - returned by scrape_courses function
+    :param scrape_time: time the rows were scraped, datetime object
+    :param dbname: Name of the database to write to
+    """
+    # Account for courses that can be registered for
+    for i in range(0, len(rows)):
+        if len(rows[i]) == 26:
+            rows[i] = rows[i][4:]
     row_size = 22
     ue_rows = [row for row in rows[1:] if len(row) != row_size]
     if len(ue_rows) != 0:
         logging.error(f"Bad row lengths found:{len(ue_rows)}")
         logging.error(f"Rows\n{ue_rows}")
 
-    ## Build Table ##
+    # Table layout could change within rows of len 22 and 26
+    # Ensure at minimum, key fields can be repd as int
+    irows = [[row[2]] + [row[4]] + row[12:18] for row in rows[2:]]
+    try:
+        [int(el) for row in irows for el in row]
+    except ValueError:
+        logging.exception("Non integers found where expected in course table")
+        # Email may not send correctly here. Needs verification.
+        subject = "Non integers would in course table"
+        body = f"""\
+        Execution should halt for db preservation
+        Rows:{rows}
+        """
+        body = dedent(body)
+        send_email(subject, body)
+        raise  # This should be a fatal error to keep db clean
+
+    # Build Table
     # conn = sqlite3.connect(':memory:', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
     conn = sqlite3.connect(dbname, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
     cursor = conn.cursor()
@@ -297,15 +478,16 @@ def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
             crn = row[2]
             row_data = tuple(row[1:12] + row[18:21])
             cursor.execute(f"SELECT * FROM {course_tbl} where CRN='{crn}'")
-            tbl_data = cursor.fetchone()
-            if row_data != tbl_data:
+            tbl_data = cursor.fetchall()
+            if row_data not in tbl_data:
                 logging.warning("Changes to course table rows")
                 logging.warning(f"scrape: {row_data}")
                 logging.warning(f"db:     {tbl_data}")
                 # log differences:
-                for i in range(0,len(row_data)):
-                    if row_data[i] != tbl_data[i]:
-                        logging.warning(f"{tbl_data[i]} -> {row_data[i]}")
+                # UNTESTED
+                # for i in range(0,len(row_data)):
+                #     if row_data[i] != tbl_data[i]:
+                #         logging.warning(f"{tbl_data[i]} -> {row_data[i]}")
                 # Add course if change discovered
                 # Potential here for runaway course table growth
                 # Future should track relation of like rows
@@ -317,7 +499,7 @@ def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
 
     # Ensure there is no SQL in the course names
     # Highly unlikely, but good practice
-    # Also room here to ensure only legal table names attempted
+    # Also some assurance of legal table names
     # Currently ensures starting with letter as tables cannot start with number
     # Testcase TBD
     for course in courses:
@@ -355,101 +537,6 @@ def add_to_db(rows, scrape_time, dbname='OMSCS_CA.db'):
     conn.close()
     logging.debug("DB fill finished")
 
-def scheduled_actions(browser, semester, userid, pwd):
-    """
-    Actions taken repeatedly to generate timeseries
-
-    I see potential here for unhandled exceptions if resources unavailable
-
-    :param browser:
-    :param semester:
-    :return:
-    """
-    ct = datetime.datetime.now()
-    print(f"Taking scheduled action {ct}")
-    logging.debug(f"Preforming scheduled actions on {semester}")
-    gt_login(browser, userid, pwd)
-    rows = scrape_courses(browser, semester)
-    scrape_time = datetime.datetime.now()
-    add_to_db(rows, scrape_time)
-
-def coordinator(userid, pwd, semester='201808'):
-    """
-    Coordinates high level actions scraper
-
-    :param userid:
-    :param pwd:
-    :param semester:
-    :return:
-    """
-    logging.debug("Running main code")
-    # setup_logging()
-    browser = browser_setup()
-    scheduler = BlockingScheduler()
-    scheduler.add_job(scheduled_actions,
-                      args=[browser, semester, userid, pwd],
-                      trigger='interval',
-                      minutes=30,
-                      next_run_time=datetime.datetime.now())
-    try:
-        print("Starting scheduler")
-        print('Press Ctrl+C to exit')
-        scheduler.start()
-    except (KeyboardInterrupt, SystemExit):
-        pass
-
-def bad_args():
-    """
-    Behavior to be followed if bad arguments are used when CLI called
-    """
-    print("Invalid arguments")
-    print("This scrip can be called by supplying the username and password")
-    print("From the CLI,")
-    print("EG: python OMSCS_course_availability.py username password")
-    print("Or")
-    print("By setting up a .env file (recommended)")
-    exit()
-
-def cli_actions():
-    """
-    Actions to take only when run as a script.
-
-    Can be called with username and password as CLI arguments
-    OR
-    With username and password as elements of local .env file
-
-    Added .env per recommendation in Miguel Grinberg's 2018 PyCon talk
-    https://www.youtube.com/watch?v=2uaTPmNvH0I
-    """
-    if len(sys.argv) == 1:
-        # If no CLI arguments, check local .env
-        load_dotenv(dotenv_path="./.env")
-        userid = os.environ.get('OMS_ID')
-        pwd = os.environ.get('OMS_PWD')
-        ba = 0
-        if (userid is None):
-            print("Could not find OMS_ID in .env")
-            ba += 1
-        elif (pwd is None):
-            print("Could not find OMS_PWD in .env")
-            ba += 1
-        if ba > 0:
-            bad_args()
-        coordinator(userid, pwd)
-    elif len(sys.argv) == 3:
-        # Actions if username and password supplied as CLI arguments
-        userid = sys.argv[1]
-        pwd = sys.argv[2]
-        coordinator(userid, pwd)
-
 
 if __name__ == "__main__":
-    cli_actions()
-    # try:
-    #     cli_actions()
-    # except Exception as e:
-    #     send_email()
-    #     print("Exception occurred, exiting!")
-    #     exit()
-    #     # logger.exception('Unhandled Exception')
-
+    print("These aren't the droids you're looking for")
