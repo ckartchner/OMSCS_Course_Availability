@@ -1,25 +1,21 @@
 
 # OMSCS_Course_Availability
 
-## Overview
-Run this script to be automatically taken to the Course Availability page most
-relevant to OMSCS students.
+Scripts to make navigating OSCAR registration easier
 
-At GT, getting to the course availability page can be annoying, especially if
-you find yourself doing it repeatedly. When I recently didn't manage to get
-online during the first day of registration I found myself unable to register
-for the courses I wanted. Consequently, I fell under the curse of constantly
-checking course the availability waiting to pounce when more seats were
-made available.
+## File overview
+- coursexp.py - Course Explorer - library used to interact with OSCAR
+- etracker.py - Enrollment Tracker - Stores enrollment info in a database for later reference
+- regpage.py - Navigate directly to registration page. It doesn't get much faster than this.
 
-This script automates that process.
+## Environment variable setup
 
-To use this script, your GT username and password will need to be supplied.
-This can be done by either using a .env file or running the script with your
-username and password as CLI args.
+To use the scripts, at minimum your GT username and password will need to be supplied.
+To prevent putting your id/password in your history and to avoid accidentally commiting
+them to git these scripts expect the use of an environment variables file.
 Necessary DUO login actions still need to be handled separately.
 
-Using a .env file (Recommended):
+To setup the .env file:
 1) In the same directory as your OMSCS_course_availability.py,
 open a .env with your favorite editor
 ```
@@ -32,19 +28,22 @@ OMS_ID=yourUserName
 OMS_PWD=yourPassword
 ```
 
-Using CLI args:
-python OMSCS_course_availability.py username password
+3) Save
+
+Additionally, etracker currently expects the following in the .env file:
+- EMAIL_PWD - password for smtp server login
+- EMAIL_USER - username for smtp server login
+- TO_EMAIL - email address messages should go to
+- FROM_EMAIL - email address messages should be reported as from
+
 
 ## Requirements
 0) Python 3.x
 1) selenium installed for Python
 2) [geckodriver](https://github.com/mozilla/geckodriver/releases) for Firefox
 3) python-dotenv
+4) lxml
 
 Using other browsers should work as well, but the [appropriate driver](https://seleniumhq.github.io/docs/wd.html#quick_reference) will be needed.
 Additionally, the line identifying the browser will also need to be edited:
 "browser = webdriver.Firefox()"
-
-## Notes
-Semester selection is currently hardcoded to Fall 2018. Update TBD.  
-Ideally it would be preferable if a login wasn't needed to access these pages.
