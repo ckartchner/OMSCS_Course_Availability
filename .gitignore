@@ -1,8 +1,9 @@
-*.pyc
 .env
+*.pyc
 *.log
 *.db
 cookies.pkl
 screenshots/
-OLD/
+backups/
 NextSteps.txt
+Notes.txt
