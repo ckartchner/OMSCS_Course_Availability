@@ -42,7 +42,7 @@ def coordinator(semester='201808'):
     :param semester: Semester used in gotosem navigation
     """
     logging.debug("Running main code")
-    browser = browser_setup(headless=False)
+    browser = browser_setup(headless=True)
     scheduler = BlockingScheduler()
     scheduler.add_job(scheduled_actions,
                       args=[browser, semester],
