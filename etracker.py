@@ -6,13 +6,10 @@ Records enrollment changes over time
 from apscheduler.schedulers.blocking import BlockingScheduler
 import datetime
 import logging
-from coursexp import browser_setup, gtlogin, gotosem, scrape_courses, dbadd
+from coursexp import browser_setup, gtlogin, gotosem, scrape_courses, dbadd, logsetup
 
-# Need to do something about the scope here?
-logging.basicConfig(
-    filename='OMSCS_CA.log',
-    format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger = logsetup(logger)
 
 
 def scheduled_actions(browser, semester):
@@ -27,7 +24,7 @@ def scheduled_actions(browser, semester):
     """
     ct = datetime.datetime.now()
     print(f"Taking scheduled action {ct}")
-    logging.debug(f"Preforming scheduled actions on {semester}")
+    logger.info(f"Preforming scheduled actions on {semester}")
     gtlogin(browser)
     gotosem(browser, semester)
     rows = scrape_courses(browser)
@@ -41,7 +38,7 @@ def coordinator(semester='201808'):
 
     :param semester: Semester used in gotosem navigation
     """
-    logging.debug("Running main code")
+    logger.debug("Starting the coordinator")
     browser = browser_setup(headless=True)
     scheduler = BlockingScheduler()
     scheduler.add_job(scheduled_actions,
