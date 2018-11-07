@@ -90,3 +90,4 @@ If -v isn't used, if the process ever stops running, all generated data will be 
 - Migrate to Python 3.7.1+
 - dbadd.semester_prefix -- needs to be dynamic for each semester
 - Add support for multiple course types, especially CSE. Currently pinned to only online CS courses. Add CLI flag.
+- Get root cause for daily "unspecified errors" being logged. 
