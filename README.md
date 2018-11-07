@@ -59,7 +59,7 @@ Additionally, the line identifying the browser will also need to be edited:
 ## Docker
 ### Build
 In the directory containing the Dockerfile, run:  
-`docker build -t <newimage_name>`
+`docker build -t <newimage_name> .`
 
 ### Run
 `docker run -d -v /local/directory/for/data:/shared/container/directory <image_name> python3.6 etracker.py`
@@ -83,3 +83,9 @@ If -v isn't used, if the process ever stops running, all generated data will be 
 `docker load -i <output_img.tar>`
 3. Verify image present  
 `docker images`
+
+## TODOs
+- Add argparser to etracker
+- Add check for new semester being made available. (Need to catch first students added. Missed for Spring 2019)
+- Migrate to Python 3.7.1+
+- dbadd.semester_prefix -- needs to be dynamic for each semester

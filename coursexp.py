@@ -441,7 +441,7 @@ def dbadd(rows, scrape_time, dbname='OMSCS_CA.db'):
     conn = sqlite3.connect(dbname, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
     cursor = conn.cursor()
     courses = [row[2] for row in rows[2:]]
-    semester_prefix = "F18"
+    semester_prefix = "S19"
     course_tbl = f"courses{semester_prefix}"
     # Sanitize table name. May be useful when semester_prefix is taken as arg
     if not course_tbl.isalnum():

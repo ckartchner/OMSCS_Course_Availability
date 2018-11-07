@@ -32,7 +32,7 @@ def scheduled_actions(browser, semester):
     dbadd(rows, scrape_time)
 
 
-def coordinator(semester='201808'):
+def coordinator(semester='201902'):
     """
     Coordinates initial setup, then schedules repeated actions of scraper
 
@@ -55,4 +55,6 @@ def coordinator(semester='201808'):
 
 
 if __name__ == "__main__":
+    # TODO add argparse:
+    # Args: headless, semester
     coordinator()
