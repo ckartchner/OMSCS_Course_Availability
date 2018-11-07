@@ -89,3 +89,4 @@ If -v isn't used, if the process ever stops running, all generated data will be 
 - Add check for new semester being made available. (Need to catch first students added. Missed for Spring 2019)
 - Migrate to Python 3.7.1+
 - dbadd.semester_prefix -- needs to be dynamic for each semester
+- Add support for multiple course types, especially CSE. Currently pinned to only online CS courses. Add CLI flag.
