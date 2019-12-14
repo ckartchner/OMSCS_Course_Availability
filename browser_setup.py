@@ -15,6 +15,7 @@ def browser_setup(browser="Firefox", headless=True):
         from selenium.webdriver.chrome.options import Options
         options = Options()
         options.headless = headless
+        options.add_experimental_option("detach", True)  # Keeps Chrome window open after script terminates
         browser = webdriver.Chrome(chrome_options=options)
     else:
         print("Unsupported browser type")
