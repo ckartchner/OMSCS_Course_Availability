@@ -5,7 +5,7 @@ a little less painful, and a little more automated.
 
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait  # available since 2.4.0
-from selenium.webdriver.support import expected_conditions as EC  # available since 2.26.0
+from selenium.webdriver.support import expected_conditions as expected  # available since 2.26.0
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.firefox.options import Options
@@ -24,7 +24,7 @@ import re
 import logging
 
 # Logging setup as child of __main__
-logger = logging.getLogger('__main__.'+__name__)
+logger = logging.getLogger('__main__.' + __name__)
 logger.setLevel(logging.DEBUG)
 
 
@@ -45,7 +45,7 @@ def logsetup(ilogger, logfile='OMSCS_CA.log'):
     return ilogger
 
 
-def send_email(subject: str="", body: str=""):
+def send_email(subject: str = "", body: str = ""):
     """
     Send email notifications
 
@@ -116,6 +116,7 @@ def catchall(fction):
 
     :param fction: Function being wrapped
     """
+
     def wrapper(*args, **kwargs):
         try:
             fction(*args, **kwargs)
@@ -185,13 +186,13 @@ def gtlogin(browser, auto_push=False, **kwargs):
         if auto_push is False:
             # Ensures remember me for 7 days is selected when push gets sent
             # Doesn't seem to matter though... login info save between sessions not yet working.
-            WebDriverWait(browser, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "duo_iframe")))
+            WebDriverWait(browser, 10).until(expected.frame_to_be_available_and_switch_to_it((By.ID, "duo_iframe")))
             # Select "Remember me for 7 days"
-            WebDriverWait(browser, 10).until(EC.element_to_be_clickable((By.NAME, "dampen_choice")))
+            WebDriverWait(browser, 10).until(expected.element_to_be_clickable((By.NAME, "dampen_choice")))
             browser.find_element_by_name("dampen_choice").click()
             # Send Push
             WebDriverWait(browser, 10).until(
-                EC.element_to_be_clickable((By.XPATH, ".//button[contains(text(), 'Send Me a Push')]")))
+                expected.element_to_be_clickable((By.XPATH, ".//button[contains(text(), 'Send Me a Push')]")))
             browser.find_element_by_xpath(".//button[contains(text(), 'Send Me a Push')]").click()
             # Without switching out of the iframe, a "Can't access dead object"
             # error will be thrown with next find attempt
@@ -200,13 +201,10 @@ def gtlogin(browser, auto_push=False, **kwargs):
 
     except NoSuchElementException:
         logger.debug("Buzzport login already authenticated")
-    # Raise exception to catchall. Unnecessary?
-    except:
-        raise
 
     # Long variable delay here due to waiting for duo authentication
     # timeout in seconds
-    WebDriverWait(browser, 120).until(EC.title_is("BuzzPort"))
+    WebDriverWait(browser, 120).until(expected.title_is("BuzzPort"))
     # Store login cookies
     # pickle.dump(browser.get_cookies(), open("cookies.pkl", "wb"))
 
@@ -228,7 +226,7 @@ def _lookup_classes(browser):
     try:
         if route_to_data == "old":
             # This quick link has been broken/missing for June/July Summer 2018
-            browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]"). click()
+            browser.find_element_by_xpath(".//a[contains(text(), 'Look Up Classes')]").click()
             # Since the iframe is a separate HTML document embedded in the current
             # one, it is very important to switch to the relevant iframe
             browser.switch_to.frame("the_iframe")
@@ -284,18 +282,26 @@ def avail_sems(browser, verbose=False, pkl=True, email_diffs=True):
         logger.warning("Warning: duplicate elements in option text list")
     if len(ovalues_l) != len(ovalues_s):
         logger.warning("Warning: duplicate elements in option values list")
-    check_text = True
     check_values = True
+    old_text = ""
+    old_values = ""
+    dropped_text = ""
+    new_text = ""
+    new_values = ""
     try:
         old_text = pickle.load(open("semester_text_set.p", "rb"))
+        check_text = True
     except FileNotFoundError:
-        check_text = False
         logger.info("No prev semester text found")
+        check_text = False
+        logger.info("No prev semester TEXT found")
+
     try:
         old_values = pickle.load(open("semester_values_set.p", "rb"))
     except FileNotFoundError:
         check_values = False
-        logger.info("No prev semester values found")
+        logger.info("No prev semester VALUES found")
+
     if check_text is True:
         new_text = otext_s - old_text
         dropped_text = old_text - otext_s
@@ -508,7 +514,7 @@ def dbadd(rows, scrape_time, dbname='OMSCS_CA.db'):
     # Currently ensures starting with letter as tables cannot start with number
     # Testcase TBD
     for course in courses:
-        if re.match('^[a-zA-Z][\w]+$', course):
+        if re.match(r"^[a-zA-Z][\w]+$", course):
             logger.error(f"Illegal course name found: {course}")
             exit()
     course_tables = [semester_prefix + "_" + course for course in courses]
