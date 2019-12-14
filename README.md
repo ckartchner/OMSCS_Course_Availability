@@ -46,13 +46,14 @@ However, the basic needs are:
 0. Python 3.x
 1. Browser (Firefox)
 2. [geckodriver](https://github.com/mozilla/geckodriver/releases) for Firefox
-3. Python requirements  
+3. Python requirements (install with "pip install -r requirements.txt")
     1. lxml
     2. selenium
     3. apscheduler
     4. python-dotenv
 
-Using other browsers should work as well, but the [appropriate driver](https://seleniumhq.github.io/docs/wd.html#quick_reference) will be needed.
+Using other browsers should work as well, but the [appropriate driver](https://selenium.dev/downloads/) will be needed.  
+To "install" the driver, add it to your path. On Linux you can place the file in "/usr/local/bin"  
 Additionally, the line identifying the browser will also need to be edited:
 "browser = webdriver.Firefox()"
 
