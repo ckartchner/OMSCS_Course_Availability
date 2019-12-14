@@ -3,12 +3,10 @@ Library for making interactions with GT registration
 a little less painful, and a little more automated.
 """
 
-from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait  # available since 2.4.0
 from selenium.webdriver.support import expected_conditions as expected  # available since 2.26.0
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from dotenv import load_dotenv  # installed with 'pip install python-dotenv'
 from lxml import html
@@ -81,31 +79,6 @@ def send_email(subject: str = "", body: str = ""):
         to_email,
         message)
     server.quit()
-
-
-def browser_setup(headless=True):
-    """
-    General browser config
-
-    :param headless: Set if headless mode is to be used with the browser
-    """
-    # General browser config
-    options = Options()
-    options.headless = headless
-    browser = webdriver.Firefox(firefox_options=options)
-
-    # Load cookies ... doesn't help bypass the need for a push
-    # browser.implicitly_wait(15)  # wait 15 seconds for any field to appear
-    # browser.get("https://buzzport.gatech.edu/cp/home/displaylogin")
-    # try:
-    #     cookies = pickle.load(open("cookies.pkl", "rb"))
-    #     for cookie in cookies:
-    #         browser.add_cookie(cookie)
-    # except FileNotFoundError:
-    #     logger.debug('Cookie Monster is disappointed. No cookies found.')
-    # browser.find_element_by_id("login_btn").click()
-
-    return browser
 
 
 def catchall(fction):

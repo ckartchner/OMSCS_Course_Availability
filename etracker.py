@@ -6,7 +6,8 @@ Records enrollment changes over time
 from apscheduler.schedulers.blocking import BlockingScheduler
 import datetime
 import logging
-from coursexp import browser_setup, gtlogin, gotosem, scrape_courses, dbadd, logsetup
+from coursexp import gtlogin, gotosem, scrape_courses, dbadd, logsetup
+from browser_setup import browser_setup
 
 logger = logging.getLogger(__name__)
 logger = logsetup(logger)
