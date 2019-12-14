@@ -9,7 +9,7 @@ logger = logsetup(logger)
 
 # Navigate to page
 browser = browser_setup(headless=False)
-gtlogin(browser)
+gtlogin(browser, True)
 semester = '201902'
 gotosem(browser, semester)
 exit()
